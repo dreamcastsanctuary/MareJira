@@ -16,7 +16,7 @@ public class ViewTasks {
         _db = db;
     }
     
-    [DefaultMemberPermissions(GuildPermission.ManageNicknames)]
+    [DefaultMemberPermissions(GuildPermission.ManageRoles)]
     public async Task HandleViewTaskCommand(SocketSlashCommand command, DiscordSocketClient client) {
         var taskName = command.Data.Options.FirstOrDefault(o => o.Name == "task_name")?.Value?.ToString();
 
@@ -55,7 +55,7 @@ public class ViewTasks {
         await command.FollowupAsync(embed: embedBuilder.Build(), ephemeral: true);
     }
     
-    [DefaultMemberPermissions(GuildPermission.ManageNicknames)]
+    [DefaultMemberPermissions(GuildPermission.ManageRoles)]
     public async Task HandleViewAllCommand(SocketSlashCommand command, DiscordSocketClient client) {
         
         var tasks = _db.ViewAll(command.User.Id.ToString());

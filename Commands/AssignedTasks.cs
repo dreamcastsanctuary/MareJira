@@ -1,5 +1,6 @@
 ﻿using System.Threading.Tasks;
 using Discord;
+using Discord.Interactions;
 using Discord.WebSocket;
 
 namespace MareJira.Commands;
@@ -12,6 +13,7 @@ public class AssignedTasks {
         _db = db;
     }
     
+    [DefaultMemberPermissions(GuildPermission.ManageRoles)]
     public async Task HandleUpdateProgressCommand(SocketSlashCommand command, DiscordSocketClient client) {
         
         var taskName = "";

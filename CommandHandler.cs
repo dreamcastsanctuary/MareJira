@@ -32,6 +32,7 @@ public class CommandHandler {
         _viewTasks = viewTasks;
         _db = db;
     }
+    
     public async Task RegisterCommands(ulong guildId) {
         
         var guild = _client.GetGuild(guildId);

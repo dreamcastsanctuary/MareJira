@@ -16,7 +16,7 @@ public class AssigneeTasks {
         _db = db;
     }
     
-    [DefaultMemberPermissions(GuildPermission.ManageNicknames)]
+    [DefaultMemberPermissions(GuildPermission.ManageRoles)]
     public async Task HandleAssignTaskCommand(SocketSlashCommand command) {
         SocketGuildUser assignee = (SocketGuildUser)command.User; 
         SocketGuildUser assignedTo = null;
@@ -76,7 +76,7 @@ public class AssigneeTasks {
         _db.CreateTask(assignedTo.Id.ToString(), assignee.Id.ToString(),DateTimeOffset.Now.ToString("MM/dd/yyyy"), deadline.ToString("MM/dd/yyyy"), taskName, description, priority, "TO-DO");
     }
     
-    [DefaultMemberPermissions(GuildPermission.ManageNicknames)]
+    [DefaultMemberPermissions(GuildPermission.ManageRoles)]
     public async Task HandleRemoveTaskCommand(SocketSlashCommand command) {
         SocketGuildUser assignee = (SocketGuildUser)command.User;
         var taskName = "";
@@ -122,7 +122,7 @@ public class AssigneeTasks {
         await command.RespondAsync(text: "Task " + taskName + " has been deleted!", ephemeral: false);
     }
     
-    [DefaultMemberPermissions(GuildPermission.ManageNicknames)]
+    [DefaultMemberPermissions(GuildPermission.ManageRoles)]
     public async Task HandleUpdateTaskCommand(SocketSlashCommand command, DiscordSocketClient client) {
     
     SocketGuildUser assignee = (SocketGuildUser)command.User;
