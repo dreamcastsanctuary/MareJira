@@ -19,7 +19,7 @@ public class Program {
 
     public async Task RunAsync() {
         
-        var token = Environment.GetEnvironmentVariable("BOT_TOKEN") ?? throw new Exception("BOT_TOKEN environment variable not set.");
+        var token = Environment.GetEnvironmentVariable("MARE_BOT_TOKEN") ?? throw new Exception("MARE_BOT_TOKEN environment variable not set.");
 
         _guildId = ulong.Parse(Environment.GetEnvironmentVariable("GUILD_ID") ?? throw new Exception("GUILD_ID environment variable not set."));
         
