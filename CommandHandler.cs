@@ -48,17 +48,20 @@ public class CommandHandler {
                         .WithName("priority").WithDescription("The priority of the task").WithRequired(true)
                         .AddChoice("Lowest", 1).AddChoice("Low", 2).AddChoice("Medium", 3).AddChoice("High", 4).AddChoice("Highest", 5)
                         .WithType(ApplicationCommandOptionType.Integer))
-            .AddOption("deadline", ApplicationCommandOptionType.String, "The set deadline; must be in the format \"MM/DD/YYYY\"", isRequired: false));
+            .AddOption("deadline", ApplicationCommandOptionType.String, "The set deadline; must be in the format \"MM/DD/YYYY\"", isRequired: false)
+            .WithDefaultMemberPermissions(GuildPermission.ManageRoles));
 
         commands.Add(new SlashCommandBuilder()
             .WithName("removetask")
             .WithDescription("Removes the given task from the database.")
-            .AddOption("task_name", ApplicationCommandOptionType.String, "The name of the task", isRequired: true));
+            .AddOption("task_name", ApplicationCommandOptionType.String, "The name of the task", isRequired: true)
+            .WithDefaultMemberPermissions(GuildPermission.ManageRoles));
 
         commands.Add(new SlashCommandBuilder()
             .WithName("forceremovetask")
             .WithDescription("Removes the given task from the database.")
-            .AddOption("task_name", ApplicationCommandOptionType.String, "The name of the task", isRequired: true));
+            .AddOption("task_name", ApplicationCommandOptionType.String, "The name of the task", isRequired: true)
+            .WithDefaultMemberPermissions(GuildPermission.Administrator));
         
         commands.Add(new SlashCommandBuilder()
             .WithName("updatetask")
@@ -69,7 +72,8 @@ public class CommandHandler {
                 .WithName("priority").WithDescription("The priority of the task")
                 .AddChoice("Lowest", 1).AddChoice("Low", 2).AddChoice("Medium", 3).AddChoice("High", 4).AddChoice("Highest", 5)
                 .WithType(ApplicationCommandOptionType.Integer))
-            .AddOption("deadline", ApplicationCommandOptionType.String, "The set deadline; must be in the format \"MM/DD/YYYY\""));
+            .AddOption("deadline", ApplicationCommandOptionType.String, "The set deadline; must be in the format \"MM/DD/YYYY\"")
+            .WithDefaultMemberPermissions(GuildPermission.ManageRoles));
             
         commands.Add(new SlashCommandBuilder()
             .WithName("forceupdatetask")
@@ -80,22 +84,26 @@ public class CommandHandler {
                 .WithName("priority").WithDescription("The priority of the task")
                 .AddChoice("Lowest", 1).AddChoice("Low", 2).AddChoice("Medium", 3).AddChoice("High", 4).AddChoice("Highest", 5)
                 .WithType(ApplicationCommandOptionType.Integer))
-            .AddOption("deadline", ApplicationCommandOptionType.String, "The set deadline; must be in the format \"MM/DD/YYYY\""));
+            .AddOption("deadline", ApplicationCommandOptionType.String, "The set deadline; must be in the format \"MM/DD/YYYY\"")
+            .WithDefaultMemberPermissions(GuildPermission.Administrator));
         
 
         
         commands.Add(new SlashCommandBuilder()
             .WithName("viewtask")
             .WithDescription("Views a task.")
-            .AddOption("task_name", ApplicationCommandOptionType.String, "The name of the task", isRequired: true));
+            .AddOption("task_name", ApplicationCommandOptionType.String, "The name of the task", isRequired: true)
+            .WithDefaultMemberPermissions(GuildPermission.ManageRoles));
 
         commands.Add(new SlashCommandBuilder()
             .WithName("viewall")
-            .WithDescription("Views all tasks."));
+            .WithDescription("Views all tasks.")
+            .WithDefaultMemberPermissions(GuildPermission.ManageRoles));
         
         commands.Add(new SlashCommandBuilder()
             .WithName("vieweveryone")
-            .WithDescription("Views everyone's tasks."));
+            .WithDescription("Views everyone's tasks.")
+            .WithDefaultMemberPermissions(GuildPermission.ManageRoles));
         
         commands.Add(new SlashCommandBuilder()
             .WithName("updateprogress")
@@ -104,7 +112,8 @@ public class CommandHandler {
             .AddOption(new SlashCommandOptionBuilder()
                 .WithName("progress").WithDescription("The progress of the task").WithRequired(true)
                 .AddChoice("TO-DO", "TO-DO").AddChoice("IN PROGRESS", "IN PROGRESS").AddChoice("COMPLETED", "COMPLETED")
-                .WithType(ApplicationCommandOptionType.String)));
+                .WithType(ApplicationCommandOptionType.String))
+            .WithDefaultMemberPermissions(GuildPermission.ManageRoles));
         
         
             
