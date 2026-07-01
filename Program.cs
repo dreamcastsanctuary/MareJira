@@ -33,7 +33,7 @@ public class Program {
             
             ulong roleId = 1473508563887329447;
             var memberCount = _client.GetGuild(_guildId).Users.Count(u => !u.IsBot && u.Roles.Any(r => r.Id == roleId));
-            await _client.SetActivityAsync(new CustomStatusGame("Assisting " + memberCount + " faculty members..."));
+            await _client.SetActivityAsync(new CustomStatusGame("Assisting " + memberCount + " staff members..."));
             
         };
         
