@@ -9,4 +9,6 @@ public class TaskModel {
     public string? Description { get; set; }
     public string Priority     { get; set; }
     public string Progress     { get; set; }
+    public string ReminderStage { get; set; } = "NONE";
+    public string? LastOverdueReminderDate { get; set; }
 }

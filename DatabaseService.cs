@@ -30,10 +30,38 @@ public class DatabaseService {
                 Deadline TEXT NOT NULL,
                 Description TEXT,
                 Priority TEXT NOT NULL,
-                Progress TEXT NOT NULL
+                Progress TEXT NOT NULL,
+                ReminderStage TEXT NOT NULL DEFAULT 'NONE',
+                LastOverdueReminderDate TEXT
             );";
         
         command.ExecuteNonQuery();
+
+        // Existing databases created before the reminder feature won't have these
+        // columns yet, since CREATE TABLE IF NOT EXISTS doesn't alter existing tables.
+        EnsureColumnExists(connection, "ReminderStage", "TEXT NOT NULL DEFAULT 'NONE'");
+        EnsureColumnExists(connection, "LastOverdueReminderDate", "TEXT");
+    }
+
+    private static void EnsureColumnExists(SqliteConnection connection, string columnName, string columnDefinition) {
+        var checkCommand = connection.CreateCommand();
+        checkCommand.CommandText = "PRAGMA table_info(Task);";
+
+        bool exists = false;
+        using (var reader = checkCommand.ExecuteReader()) {
+            while (reader.Read()) {
+                if (string.Equals(reader.GetString(reader.GetOrdinal("name")), columnName, StringComparison.OrdinalIgnoreCase)) {
+                    exists = true;
+                    break;
+                }
+            }
+        }
+
+        if (!exists) {
+            var alterCommand = connection.CreateCommand();
+            alterCommand.CommandText = $"ALTER TABLE Task ADD COLUMN {columnName} {columnDefinition};";
+            alterCommand.ExecuteNonQuery();
+        }
     }
 
     public void CreateTask(string assignedTo, string assignee, 
@@ -45,7 +73,8 @@ public class DatabaseService {
         var command = connection.CreateCommand();
 
         command.CommandText =
-            @"INSERT INTO Task (TaskName, AssignedId, AssigneeId, DateAssigned, Deadline, Description, Priority, Progress) VALUES ($taskName, $assignedTo, $assignee, $dateAssigned, $deadline, $description, $priority, $progress);";
+            @"INSERT INTO Task (TaskName, AssignedId, AssigneeId, DateAssigned, Deadline, Description, Priority, Progress, ReminderStage, LastOverdueReminderDate)
+              VALUES ($taskName, $assignedTo, $assignee, $dateAssigned, $deadline, $description, $priority, $progress, 'NONE', NULL);";
         
         command.Parameters.AddWithValue("$taskName", taskName);
         command.Parameters.AddWithValue("$assignedTo", assignedTo);
@@ -82,8 +111,20 @@ public class DatabaseService {
 
         using var connection = new SqliteConnection(_connectionString);
         connection.Open();
-        var command = connection.CreateCommand();
 
+        // If the deadline is actually changing, reset the reminder tracking so the
+        // task gets a fresh 3-day/1-day/overdue reminder cycle against the new date,
+        // instead of e.g. staying stuck in "OVERDUE" against a deadline that no longer applies.
+        bool deadlineChanged = false;
+        if (deadline != null) {
+            var currentDeadlineCommand = connection.CreateCommand();
+            currentDeadlineCommand.CommandText = "SELECT Deadline FROM Task WHERE TaskName = $taskName;";
+            currentDeadlineCommand.Parameters.AddWithValue("$taskName", taskName);
+            var currentDeadline = Convert.ToString(currentDeadlineCommand.ExecuteScalar()) ?? "";
+            deadlineChanged = !string.Equals(currentDeadline, deadline, StringComparison.Ordinal);
+        }
+
+        var command = connection.CreateCommand();
         var setClauses = new List<string>();
 
         if (deadline != null) {
@@ -97,6 +138,12 @@ public class DatabaseService {
         if (priority != null) {
             setClauses.Add("Priority = $priority");
             command.Parameters.AddWithValue("$priority", priority);
+        }
+        if (deadlineChanged) {
+            setClauses.Add("ReminderStage = $reminderStage");
+            command.Parameters.AddWithValue("$reminderStage", "NONE");
+            setClauses.Add("LastOverdueReminderDate = $lastOverdueReminderDate");
+            command.Parameters.AddWithValue("$lastOverdueReminderDate", DBNull.Value);
         }
 
         if (setClauses.Count == 0) return;
@@ -134,11 +181,9 @@ public class DatabaseService {
         command.Parameters.AddWithValue("$taskName", taskName);
         command.Parameters.AddWithValue("$progress", progress);
 
-        if (progress.Equals("COMPLETED")) {
-            return true;
-        }
-        
-        return false;
+        var rowsAffected = command.ExecuteNonQuery();
+
+        return rowsAffected > 0 && progress.Equals("COMPLETED", StringComparison.OrdinalIgnoreCase);
     }
 
     public string GetProgress(string taskName) {
@@ -205,6 +250,41 @@ public class DatabaseService {
         var result = command.ExecuteScalar();
         return Convert.ToString(result) ?? "";
     }
+
+    // Updates the reminder-tracking state for a task. Called by ReminderService after it
+    // sends a reminder, so it knows not to send that same reminder again.
+    public void UpdateReminderState(string taskName, string reminderStage, string? lastOverdueReminderDate) {
+
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        var command = connection.CreateCommand();
+        command.CommandText = "UPDATE Task SET ReminderStage = $stage, LastOverdueReminderDate = $lastOverdue WHERE TaskName = $taskName;";
+        command.Parameters.AddWithValue("$stage", reminderStage);
+        command.Parameters.AddWithValue("$lastOverdue", (object?)lastOverdueReminderDate ?? DBNull.Value);
+        command.Parameters.AddWithValue("$taskName", taskName);
+
+        command.ExecuteNonQuery();
+    }
+
+    // Returns every task that isn't completed yet, for the reminder service to scan
+    // through and decide whether any deadline-based reminders are due.
+    public List<TaskModel> GetActiveTasksWithDeadlines() {
+
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT * FROM Task WHERE Progress != 'COMPLETED';";
+
+        using var reader = command.ExecuteReader();
+
+        var tasks = new List<TaskModel>();
+        while (reader.Read()) {
+            tasks.Add(ReadTask(reader));
+        }
+        return tasks;
+    }
     
     public TaskModel? ViewTask(string taskName) {
         
@@ -218,16 +298,7 @@ public class DatabaseService {
         using var reader = command.ExecuteReader();
         if (!reader.Read()) return null;
 
-        return new TaskModel {
-            TaskName     = reader.GetString(reader.GetOrdinal("TaskName")),
-            AssignedId   = reader.GetString(reader.GetOrdinal("AssignedId")),
-            AssigneeId   = reader.GetString(reader.GetOrdinal("AssigneeId")),
-            DateAssigned = reader.GetString(reader.GetOrdinal("DateAssigned")),
-            Deadline     = reader.GetString(reader.GetOrdinal("Deadline")),
-            Description  = reader.IsDBNull(reader.GetOrdinal("Description")) ? null : reader.GetString(reader.GetOrdinal("Description")),
-            Priority     = reader.GetString(reader.GetOrdinal("Priority")),
-            Progress     = reader.GetString(reader.GetOrdinal("Progress"))
-        };
+        return ReadTask(reader);
     }
     
     public List<TaskModel?> ViewAll(string assignedId) {
@@ -246,17 +317,7 @@ public class DatabaseService {
         List<TaskModel> tasks = new List<TaskModel>();
         while (reader.Read())
         {
-            tasks.Add(new TaskModel
-            {
-                TaskName     = reader.GetString(reader.GetOrdinal("TaskName")),
-                AssignedId   = reader.GetString(reader.GetOrdinal("AssignedId")),
-                AssigneeId   = reader.GetString(reader.GetOrdinal("AssigneeId")),
-                DateAssigned = reader.GetString(reader.GetOrdinal("DateAssigned")),
-                Deadline     = reader.GetString(reader.GetOrdinal("Deadline")),
-                Description  = reader.IsDBNull(reader.GetOrdinal("Description")) ? null : reader.GetString(reader.GetOrdinal("Description")),
-                Priority     = reader.GetString(reader.GetOrdinal("Priority")),
-                Progress     = reader.GetString(reader.GetOrdinal("Progress"))
-            });
+            tasks.Add(ReadTask(reader));
         }
         return tasks;
     }
@@ -276,19 +337,24 @@ public class DatabaseService {
         List<TaskModel> tasks = new List<TaskModel>();
         while (reader.Read())
         {
-            tasks.Add(new TaskModel
-            {
-                TaskName     = reader.GetString(reader.GetOrdinal("TaskName")),
-                AssignedId   = reader.GetString(reader.GetOrdinal("AssignedId")),
-                AssigneeId   = reader.GetString(reader.GetOrdinal("AssigneeId")),
-                DateAssigned = reader.GetString(reader.GetOrdinal("DateAssigned")),
-                Deadline     = reader.GetString(reader.GetOrdinal("Deadline")),
-                Description  = reader.IsDBNull(reader.GetOrdinal("Description")) ? null : reader.GetString(reader.GetOrdinal("Description")),
-                Priority     = reader.GetString(reader.GetOrdinal("Priority")),
-                Progress     = reader.GetString(reader.GetOrdinal("Progress"))
-            });
+            tasks.Add(ReadTask(reader));
         }
         return tasks;
         
+    }
+
+    private static TaskModel ReadTask(SqliteDataReader reader) {
+        return new TaskModel {
+            TaskName     = reader.GetString(reader.GetOrdinal("TaskName")),
+            AssignedId   = reader.GetString(reader.GetOrdinal("AssignedId")),
+            AssigneeId   = reader.GetString(reader.GetOrdinal("AssigneeId")),
+            DateAssigned = reader.GetString(reader.GetOrdinal("DateAssigned")),
+            Deadline     = reader.GetString(reader.GetOrdinal("Deadline")),
+            Description  = reader.IsDBNull(reader.GetOrdinal("Description")) ? null : reader.GetString(reader.GetOrdinal("Description")),
+            Priority     = reader.GetString(reader.GetOrdinal("Priority")),
+            Progress     = reader.GetString(reader.GetOrdinal("Progress")),
+            ReminderStage = reader.IsDBNull(reader.GetOrdinal("ReminderStage")) ? "NONE" : reader.GetString(reader.GetOrdinal("ReminderStage")),
+            LastOverdueReminderDate = reader.IsDBNull(reader.GetOrdinal("LastOverdueReminderDate")) ? null : reader.GetString(reader.GetOrdinal("LastOverdueReminderDate"))
+        };
     }
 }

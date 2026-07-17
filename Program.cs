@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Discord;
 using Discord.WebSocket;
+using Mare_Jira;
 using MareJira.Commands;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -12,6 +13,7 @@ public class Program {
     private DiscordSocketClient _client;
     private ulong _guildId;
     private CommandHandler _commandHandler;
+    private ReminderService _reminderService;
     private static IServiceProvider _serviceProvider;
 
     public static async Task Main()
@@ -26,6 +28,7 @@ public class Program {
         _serviceProvider = CreateProvider();
         _client = _serviceProvider.GetRequiredService<DiscordSocketClient>();
         _commandHandler = _serviceProvider.GetRequiredService<CommandHandler>();
+        _reminderService = _serviceProvider.GetRequiredService<ReminderService>();
         
         _client.Log += Log;
         _client.Ready += async () => {
@@ -34,7 +37,8 @@ public class Program {
             ulong roleId = 1473508563887329447;
             var memberCount = _client.GetGuild(_guildId).Users.Count(u => !u.IsBot && u.Roles.Any(r => r.Id == roleId));
             await _client.SetActivityAsync(new CustomStatusGame("Assisting " + memberCount + " staff members..."));
-            
+
+            _reminderService.Start();
         };
         
         await _client.LoginAsync(TokenType.Bot, token);
@@ -64,6 +68,7 @@ public class Program {
             .AddSingleton<AssignedTasks>()
             .AddSingleton<ViewTasks>()
             .AddSingleton<DatabaseService>()
+            .AddSingleton<ReminderService>()
             .BuildServiceProvider();
     }
 }

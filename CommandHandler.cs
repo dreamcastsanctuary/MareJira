@@ -103,7 +103,7 @@ public class CommandHandler {
         commands.Add(new SlashCommandBuilder()
             .WithName("vieweveryone")
             .WithDescription("Views everyone's tasks.")
-            .WithDefaultMemberPermissions(GuildPermission.ManageRoles));
+            .WithDefaultMemberPermissions(GuildPermission.Administrator));
         
         commands.Add(new SlashCommandBuilder()
             .WithName("updateprogress")

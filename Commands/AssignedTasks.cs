@@ -40,7 +40,7 @@ public class AssignedTasks {
         if (check) {
             var assigner = client.GetUser(ulong.Parse(_db.GetAssigneeId(taskName))) as SocketGuildUser;
             var assigned = client.GetUser(ulong.Parse(_db.GetAssignedTo(taskName))) as SocketGuildUser;
-            UserExtensions.SendMessageAsync(assigner, assigned.Nickname + " has marked their task, " + taskName + ", completed!\nGo check in with them.");
+            await UserExtensions.SendMessageAsync(assigner, assigned.Nickname + " has marked their task, " + taskName + ", completed!\nGo check in with them.");
         }
     }
 }
