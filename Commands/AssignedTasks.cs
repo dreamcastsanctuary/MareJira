@@ -35,12 +35,21 @@ public class AssignedTasks {
             }
         }
         
-        var check = _db.SetProgress(taskName, progress);
+        var (taskFound, isNowCompleted) = _db.SetProgress(taskName, progress);
+
+        if (!taskFound) {
+            await command.RespondAsync($"No task found with the name **{taskName}**. Nothing was updated.", ephemeral: true);
+            return;
+        }
+
         await command.RespondAsync("Updated progress for " + taskName + "!", ephemeral: true);
-        if (check) {
+        if (isNowCompleted) {
             var assigner = client.GetUser(ulong.Parse(_db.GetAssigneeId(taskName))) as SocketGuildUser;
             var assigned = client.GetUser(ulong.Parse(_db.GetAssignedTo(taskName))) as SocketGuildUser;
-            await UserExtensions.SendMessageAsync(assigner, assigned.Nickname + " has marked their task, " + taskName + ", completed!\nGo check in with them.");
+            if (assigner != null && assigned != null) {
+                var assignedName = assigned.Nickname ?? assigned.Username;
+                await UserExtensions.SendMessageAsync(assigner, assignedName + " has marked their task, " + taskName + ", completed!\nGo check in with them.");
+            }
         }
     }
 }

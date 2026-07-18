@@ -95,7 +95,7 @@ public class DatabaseService {
         var command = connection.CreateCommand();
         
         command.CommandText =
-            @"DELETE FROM Task WHERE TaskName = $taskName AND AssigneeId = $assigneeId;";
+            @"DELETE FROM Task WHERE TaskName = $taskName COLLATE NOCASE AND AssigneeId = $assigneeId;";
         
         command.Parameters.AddWithValue("$taskName", taskName);
         command.Parameters.AddWithValue("$assigneeId", assignee);
@@ -118,7 +118,7 @@ public class DatabaseService {
         bool deadlineChanged = false;
         if (deadline != null) {
             var currentDeadlineCommand = connection.CreateCommand();
-            currentDeadlineCommand.CommandText = "SELECT Deadline FROM Task WHERE TaskName = $taskName;";
+            currentDeadlineCommand.CommandText = "SELECT Deadline FROM Task WHERE TaskName = $taskName COLLATE NOCASE;";
             currentDeadlineCommand.Parameters.AddWithValue("$taskName", taskName);
             var currentDeadline = Convert.ToString(currentDeadlineCommand.ExecuteScalar()) ?? "";
             deadlineChanged = !string.Equals(currentDeadline, deadline, StringComparison.Ordinal);
@@ -151,7 +151,7 @@ public class DatabaseService {
         command.CommandText = $@"
         UPDATE Task
         SET {string.Join(", ", setClauses)}
-        WHERE TaskName = $taskName";
+        WHERE TaskName = $taskName COLLATE NOCASE";
 
         command.Parameters.AddWithValue("$taskName", taskName);
 
@@ -164,26 +164,30 @@ public class DatabaseService {
         connection.Open();
 
         var command = connection.CreateCommand();
-        command.CommandText = "SELECT AssigneeId FROM Task WHERE TaskName = $taskName;";
+        command.CommandText = "SELECT AssigneeId FROM Task WHERE TaskName = $taskName COLLATE NOCASE;";
         command.Parameters.AddWithValue("$taskName", taskName);
         
         var result = command.ExecuteScalar();
         return Convert.ToString(result) ?? "";
     }
 
-    public bool SetProgress(string taskName, string progress) {
+    // Returns (taskFound, isNowCompleted). taskFound is false if no task with that name exists,
+    // which lets the caller tell the user the update didn't actually happen instead of falsely
+    // reporting success.
+    public (bool taskFound, bool isNowCompleted) SetProgress(string taskName, string progress) {
         
         using var connection = new SqliteConnection(_connectionString);
         connection.Open();
 
         var command = connection.CreateCommand();
-        command.CommandText = "UPDATE Task SET Progress = $progress WHERE TaskName = $taskName;";
+        command.CommandText = "UPDATE Task SET Progress = $progress WHERE TaskName = $taskName COLLATE NOCASE;";
         command.Parameters.AddWithValue("$taskName", taskName);
         command.Parameters.AddWithValue("$progress", progress);
 
         var rowsAffected = command.ExecuteNonQuery();
+        var taskFound = rowsAffected > 0;
 
-        return rowsAffected > 0 && progress.Equals("COMPLETED", StringComparison.OrdinalIgnoreCase);
+        return (taskFound, taskFound && progress.Equals("COMPLETED", StringComparison.OrdinalIgnoreCase));
     }
 
     public string GetProgress(string taskName) {
@@ -192,7 +196,7 @@ public class DatabaseService {
         connection.Open();
 
         var command = connection.CreateCommand();
-        command.CommandText = "SELECT Progress FROM Task WHERE TaskName = $taskName;";
+        command.CommandText = "SELECT Progress FROM Task WHERE TaskName = $taskName COLLATE NOCASE;";
         command.Parameters.AddWithValue("$taskName", taskName);
         
         var result = command.ExecuteScalar();
@@ -205,7 +209,7 @@ public class DatabaseService {
         connection.Open();
 
         var command = connection.CreateCommand();
-        command.CommandText = "SELECT Description FROM Task WHERE TaskName = $taskName;";
+        command.CommandText = "SELECT Description FROM Task WHERE TaskName = $taskName COLLATE NOCASE;";
         command.Parameters.AddWithValue("$taskName", taskName);
         
         var result = command.ExecuteScalar();
@@ -218,7 +222,7 @@ public class DatabaseService {
         connection.Open();
 
         var command = connection.CreateCommand();
-        command.CommandText = "SELECT Priority FROM Task WHERE TaskName = $taskName;";
+        command.CommandText = "SELECT Priority FROM Task WHERE TaskName = $taskName COLLATE NOCASE;";
         command.Parameters.AddWithValue("$taskName", taskName);
         
         var result = command.ExecuteScalar();
@@ -231,7 +235,7 @@ public class DatabaseService {
         connection.Open();
 
         var command = connection.CreateCommand();
-        command.CommandText = "SELECT Deadline FROM Task WHERE TaskName = $taskName;";
+        command.CommandText = "SELECT Deadline FROM Task WHERE TaskName = $taskName COLLATE NOCASE;";
         command.Parameters.AddWithValue("$taskName", taskName);
         
         var result = command.ExecuteScalar();
@@ -244,7 +248,7 @@ public class DatabaseService {
         connection.Open();
 
         var command = connection.CreateCommand();
-        command.CommandText = "SELECT AssignedId FROM Task WHERE TaskName = $taskName;";
+        command.CommandText = "SELECT AssignedId FROM Task WHERE TaskName = $taskName COLLATE NOCASE;";
         command.Parameters.AddWithValue("$taskName", taskName);
         
         var result = command.ExecuteScalar();
@@ -259,7 +263,7 @@ public class DatabaseService {
         connection.Open();
 
         var command = connection.CreateCommand();
-        command.CommandText = "UPDATE Task SET ReminderStage = $stage, LastOverdueReminderDate = $lastOverdue WHERE TaskName = $taskName;";
+        command.CommandText = "UPDATE Task SET ReminderStage = $stage, LastOverdueReminderDate = $lastOverdue WHERE TaskName = $taskName COLLATE NOCASE;";
         command.Parameters.AddWithValue("$stage", reminderStage);
         command.Parameters.AddWithValue("$lastOverdue", (object?)lastOverdueReminderDate ?? DBNull.Value);
         command.Parameters.AddWithValue("$taskName", taskName);
@@ -292,7 +296,7 @@ public class DatabaseService {
         connection.Open();
 
         var command = connection.CreateCommand();
-        command.CommandText = @"SELECT * FROM Task WHERE TaskName = $taskName;";
+        command.CommandText = @"SELECT * FROM Task WHERE TaskName = $taskName COLLATE NOCASE;";
         command.Parameters.AddWithValue("$taskName", taskName);
 
         using var reader = command.ExecuteReader();
