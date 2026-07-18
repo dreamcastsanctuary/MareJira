@@ -111,10 +111,7 @@ public class DatabaseService {
 
         using var connection = new SqliteConnection(_connectionString);
         connection.Open();
-
-        // If the deadline is actually changing, reset the reminder tracking so the
-        // task gets a fresh 3-day/1-day/overdue reminder cycle against the new date,
-        // instead of e.g. staying stuck in "OVERDUE" against a deadline that no longer applies.
+        
         bool deadlineChanged = false;
         if (deadline != null) {
             var currentDeadlineCommand = connection.CreateCommand();
@@ -156,6 +153,39 @@ public class DatabaseService {
         command.Parameters.AddWithValue("$taskName", taskName);
 
         command.ExecuteNonQuery();
+    }
+
+    // Returns up to `maxResults` task names assigned to the given user, optionally filtered
+    // to names containing `filter` (case-insensitive). Used to populate the task_name
+    // autocomplete list on /updateprogress.
+    public List<string> GetTaskNamesForAssignedUser(string assignedId, string? filter = null, int maxResults = 25) {
+
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        var command = connection.CreateCommand();
+        command.CommandText = @"
+            SELECT TaskName FROM Task
+            WHERE AssignedId = $assignedId
+              AND TaskName LIKE $likeFilter ESCAPE '\' COLLATE NOCASE
+            ORDER BY TaskName
+            LIMIT $limit;";
+
+        command.Parameters.AddWithValue("$assignedId", assignedId);
+        command.Parameters.AddWithValue("$likeFilter", "%" + EscapeLikePattern(filter ?? "") + "%");
+        command.Parameters.AddWithValue("$limit", maxResults);
+
+        using var reader = command.ExecuteReader();
+
+        var names = new List<string>();
+        while (reader.Read()) {
+            names.Add(reader.GetString(0));
+        }
+        return names;
+    }
+
+    private static string EscapeLikePattern(string input) {
+        return input.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
     }
 
     public string GetAssigneeId(string taskName) {

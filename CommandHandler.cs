@@ -26,6 +26,7 @@ public class CommandHandler {
                           DatabaseService db) {
         _client = client;
         _client.SlashCommandExecuted += SlashCommandHandler;
+        _client.AutocompleteExecuted += AutocompleteHandler;
         _serviceProvider = serviceProvider;
         _assigneeTasks = assigneeTasks;
         _assignedTasks = assignedTasks;
@@ -108,7 +109,10 @@ public class CommandHandler {
         commands.Add(new SlashCommandBuilder()
             .WithName("updateprogress")
             .WithDescription("Updates the given task's progress.")
-            .AddOption("task_name", ApplicationCommandOptionType.String, "The name of the task", isRequired: true)
+            .AddOption(new SlashCommandOptionBuilder()
+                .WithName("task_name").WithDescription("The name of the task").WithRequired(true)
+                .WithAutocomplete(true)
+                .WithType(ApplicationCommandOptionType.String))
             .AddOption(new SlashCommandOptionBuilder()
                 .WithName("progress").WithDescription("The progress of the task").WithRequired(true)
                 .AddChoice("TO-DO", "TO-DO").AddChoice("IN PROGRESS", "IN PROGRESS").AddChoice("COMPLETED", "COMPLETED")
@@ -159,5 +163,19 @@ public class CommandHandler {
                 await command.RespondAsync("Unrecognized command.", ephemeral: true);
                 break;
         }
+    }
+
+    private async Task AutocompleteHandler(SocketAutocompleteInteraction interaction) {
+
+        if (interaction.Data.CommandName != "updateprogress" || interaction.Data.Current.Name != "task_name") {
+            return;
+        }
+
+        var currentInput = interaction.Data.Current.Value?.ToString() ?? "";
+        var taskNames = _db.GetTaskNamesForAssignedUser(interaction.User.Id.ToString(), currentInput);
+
+        var results = taskNames.Select(name => new AutocompleteResult(name, name));
+
+        await interaction.RespondAsync(results);
     }
 }

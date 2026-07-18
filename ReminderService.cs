@@ -9,12 +9,6 @@ using MareJira.Objects;
 
 namespace Mare_Jira;
 
-// Periodically checks every non-completed task's deadline and DMs the assignee:
-//   - 3 days before the deadline
-//   - 1 day before the deadline
-//   - the day the deadline is due
-//   - once per day, every day, for as long as the task remains overdue and incomplete
-// Tasks with no deadline set (the year-9398 sentinel) are skipped entirely.
 public class ReminderService {
 
     private const int SentinelYear = 9398;
@@ -35,7 +29,6 @@ public class ReminderService {
         _db = db;
     }
 
-    // Starts the periodic check. Safe to call more than once; only the first call takes effect.
     public void Start() {
         _timer ??= new Timer(async _ => await RunCheckSafely(), null, TimeSpan.Zero, CheckInterval);
     }
@@ -67,27 +60,27 @@ public class ReminderService {
 
             var assignedUser = _client.GetUser(assignedUserId);
             if (assignedUser == null)
-                continue; // not in the client's user cache; can't DM them
+                continue;
 
             var daysUntil = (deadline.Date - today).Days;
             var stage = string.IsNullOrEmpty(task.ReminderStage) ? StageNone : task.ReminderStage;
 
             if (daysUntil == 3 && stage == StageNone) {
-                await SendDm(assignedUser, $"⏰ Reminder: your task **{task.TaskName}** is due in 3 days.");
+                await SendDm(assignedUser, $"⏰ :: Reminder: your task **{task.TaskName}** is due in 3 days.");
                 _db.UpdateReminderState(task.TaskName, StageThreeDay, task.LastOverdueReminderDate);
             }
             else if (daysUntil == 1 && (stage == StageNone || stage == StageThreeDay)) {
-                await SendDm(assignedUser, $"⏰ Reminder: your task **{task.TaskName}** is due tomorrow!");
+                await SendDm(assignedUser, $"⏰ :: Reminder: your task **{task.TaskName}** is due tomorrow!");
                 _db.UpdateReminderState(task.TaskName, StageOneDay, task.LastOverdueReminderDate);
             }
             else if (daysUntil == 0 && stage != StageDue && stage != StageOverdue) {
-                await SendDm(assignedUser, $"📌 Your task **{task.TaskName}** is due **today**!");
+                await SendDm(assignedUser, $"📌 :: Your task **{task.TaskName}** is due **today**!");
                 _db.UpdateReminderState(task.TaskName, StageDue, todayString);
             }
             else if (daysUntil < 0 && task.LastOverdueReminderDate != todayString) {
                 var daysOverdue = Math.Abs(daysUntil);
                 var dayWord = daysOverdue == 1 ? "day" : "days";
-                await SendDm(assignedUser, $"🚨 Your task **{task.TaskName}** is now {daysOverdue} {dayWord} overdue! Please update its progress or reach out about the deadline.");
+                await SendDm(assignedUser, $"🚨 :: Your task **{task.TaskName}** is now {daysOverdue} {dayWord} overdue! Get in that server and report!");
                 _db.UpdateReminderState(task.TaskName, StageOverdue, todayString);
             }
         }
@@ -97,7 +90,6 @@ public class ReminderService {
         try {
             await UserExtensions.SendMessageAsync(user, message);
         } catch (Exception ex) {
-            // Most commonly this means the user has DMs from server members disabled.
             Console.WriteLine($"[ReminderService] Failed to DM {user.Id}: {ex.Message}");
         }
     }
