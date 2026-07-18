@@ -111,7 +111,10 @@ public class DatabaseService {
 
         using var connection = new SqliteConnection(_connectionString);
         connection.Open();
-        
+
+        // If the deadline is actually changing, reset the reminder tracking so the
+        // task gets a fresh 3-day/1-day/overdue reminder cycle against the new date,
+        // instead of e.g. staying stuck in "OVERDUE" against a deadline that no longer applies.
         bool deadlineChanged = false;
         if (deadline != null) {
             var currentDeadlineCommand = connection.CreateCommand();
@@ -155,24 +158,30 @@ public class DatabaseService {
         command.ExecuteNonQuery();
     }
 
-    // Returns up to `maxResults` task names assigned to the given user, optionally filtered
-    // to names containing `filter` (case-insensitive). Used to populate the task_name
-    // autocomplete list on /updateprogress.
-    public List<string> GetTaskNamesForAssignedUser(string assignedId, string? filter = null, int maxResults = 25) {
+    // Returns up to `maxResults` task names, optionally scoped to one owner column
+    // (AssignedId or AssigneeId) and filtered to names containing `filter` (case-insensitive).
+    // ownerColumn is always a hardcoded literal from our own code below, never user input,
+    // so interpolating it into the SQL text is safe.
+    private List<string> GetTaskNames(string? ownerColumn, string? ownerId, string? filter, int maxResults) {
 
         using var connection = new SqliteConnection(_connectionString);
         connection.Open();
 
         var command = connection.CreateCommand();
-        command.CommandText = @"
+        var whereClauses = new List<string> { "TaskName LIKE $likeFilter ESCAPE '\\' COLLATE NOCASE" };
+        command.Parameters.AddWithValue("$likeFilter", "%" + EscapeLikePattern(filter ?? "") + "%");
+
+        if (ownerColumn != null) {
+            whereClauses.Add($"{ownerColumn} = $ownerId");
+            command.Parameters.AddWithValue("$ownerId", ownerId);
+        }
+
+        command.CommandText = $@"
             SELECT TaskName FROM Task
-            WHERE AssignedId = $assignedId
-              AND TaskName LIKE $likeFilter ESCAPE '\' COLLATE NOCASE
+            WHERE {string.Join(" AND ", whereClauses)}
             ORDER BY TaskName
             LIMIT $limit;";
 
-        command.Parameters.AddWithValue("$assignedId", assignedId);
-        command.Parameters.AddWithValue("$likeFilter", "%" + EscapeLikePattern(filter ?? "") + "%");
         command.Parameters.AddWithValue("$limit", maxResults);
 
         using var reader = command.ExecuteReader();
@@ -183,6 +192,21 @@ public class DatabaseService {
         }
         return names;
     }
+
+    // Tasks assigned TO this user (they're the one doing the work). Backs /updateprogress.
+    public List<string> GetTaskNamesForAssignedUser(string assignedId, string? filter = null, int maxResults = 25)
+        => GetTaskNames("AssignedId", assignedId, filter, maxResults);
+
+    // Tasks this user created/assigned to someone else. Backs /removetask and /updatetask,
+    // since both require the caller to be the task's creator - if they haven't assigned
+    // anything, this simply returns an empty list and autocomplete shows no suggestions.
+    public List<string> GetTaskNamesForAssigneeUser(string assigneeId, string? filter = null, int maxResults = 25)
+        => GetTaskNames("AssigneeId", assigneeId, filter, maxResults);
+
+    // Every task in the database, regardless of who created or was assigned it. Backs
+    // /viewtask, /forceupdatetask, and /forceremovetask, none of which have an ownership check.
+    public List<string> GetAllTaskNames(string? filter = null, int maxResults = 25)
+        => GetTaskNames(null, null, filter, maxResults);
 
     private static string EscapeLikePattern(string input) {
         return input.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");

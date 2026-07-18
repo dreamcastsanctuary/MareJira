@@ -55,19 +55,28 @@ public class CommandHandler {
         commands.Add(new SlashCommandBuilder()
             .WithName("removetask")
             .WithDescription("Removes the given task from the database.")
-            .AddOption("task_name", ApplicationCommandOptionType.String, "The name of the task", isRequired: true)
+            .AddOption(new SlashCommandOptionBuilder()
+                .WithName("task_name").WithDescription("The name of the task").WithRequired(true)
+                .WithAutocomplete(true)
+                .WithType(ApplicationCommandOptionType.String))
             .WithDefaultMemberPermissions(GuildPermission.ManageRoles));
 
         commands.Add(new SlashCommandBuilder()
             .WithName("forceremovetask")
             .WithDescription("Removes the given task from the database.")
-            .AddOption("task_name", ApplicationCommandOptionType.String, "The name of the task", isRequired: true)
+            .AddOption(new SlashCommandOptionBuilder()
+                .WithName("task_name").WithDescription("The name of the task").WithRequired(true)
+                .WithAutocomplete(true)
+                .WithType(ApplicationCommandOptionType.String))
             .WithDefaultMemberPermissions(GuildPermission.Administrator));
         
         commands.Add(new SlashCommandBuilder()
             .WithName("updatetask")
             .WithDescription("Updates the given task.")
-            .AddOption("task_name", ApplicationCommandOptionType.String, "The name of the task", isRequired: true)
+            .AddOption(new SlashCommandOptionBuilder()
+                .WithName("task_name").WithDescription("The name of the task").WithRequired(true)
+                .WithAutocomplete(true)
+                .WithType(ApplicationCommandOptionType.String))
             .AddOption("description", ApplicationCommandOptionType.String, "The description of the task; the task itself")
             .AddOption(new SlashCommandOptionBuilder()
                 .WithName("priority").WithDescription("The priority of the task")
@@ -79,7 +88,10 @@ public class CommandHandler {
         commands.Add(new SlashCommandBuilder()
             .WithName("forceupdatetask")
             .WithDescription("Updates the given task.")
-            .AddOption("task_name", ApplicationCommandOptionType.String, "The name of the task", isRequired: true)
+            .AddOption(new SlashCommandOptionBuilder()
+                .WithName("task_name").WithDescription("The name of the task").WithRequired(true)
+                .WithAutocomplete(true)
+                .WithType(ApplicationCommandOptionType.String))
             .AddOption("description", ApplicationCommandOptionType.String, "The description of the task; the task itself")
             .AddOption(new SlashCommandOptionBuilder()
                 .WithName("priority").WithDescription("The priority of the task")
@@ -93,7 +105,10 @@ public class CommandHandler {
         commands.Add(new SlashCommandBuilder()
             .WithName("viewtask")
             .WithDescription("Views a task.")
-            .AddOption("task_name", ApplicationCommandOptionType.String, "The name of the task", isRequired: true)
+            .AddOption(new SlashCommandOptionBuilder()
+                .WithName("task_name").WithDescription("The name of the task").WithRequired(true)
+                .WithAutocomplete(true)
+                .WithType(ApplicationCommandOptionType.String))
             .WithDefaultMemberPermissions(GuildPermission.ManageRoles));
 
         commands.Add(new SlashCommandBuilder()
@@ -167,12 +182,19 @@ public class CommandHandler {
 
     private async Task AutocompleteHandler(SocketAutocompleteInteraction interaction) {
 
-        if (interaction.Data.CommandName != "updateprogress" || interaction.Data.Current.Name != "task_name") {
+        if (interaction.Data.Current.Name != "task_name") {
             return;
         }
 
         var currentInput = interaction.Data.Current.Value?.ToString() ?? "";
-        var taskNames = _db.GetTaskNamesForAssignedUser(interaction.User.Id.ToString(), currentInput);
+        var userId = interaction.User.Id.ToString();
+
+        List<string> taskNames = interaction.Data.CommandName switch {
+            "updateprogress" => _db.GetTaskNamesForAssignedUser(userId, currentInput),
+            "removetask" or "updatetask" => _db.GetTaskNamesForAssigneeUser(userId, currentInput),
+            "viewtask" or "forceremovetask" or "forceupdatetask" => _db.GetAllTaskNames(currentInput),
+            _ => new List<string>()
+        };
 
         var results = taskNames.Select(name => new AutocompleteResult(name, name));
 
