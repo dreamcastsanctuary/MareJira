@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using Discord;
-using MareJira.Objects;
+﻿using MareJira.Objects;
 using Microsoft.Data.Sqlite;
 
 namespace MareJira;
@@ -37,8 +34,6 @@ public class DatabaseService {
         
         command.ExecuteNonQuery();
 
-        // Existing databases created before the reminder feature won't have these
-        // columns yet, since CREATE TABLE IF NOT EXISTS doesn't alter existing tables.
         EnsureColumnExists(connection, "ReminderStage", "TEXT NOT NULL DEFAULT 'NONE'");
         EnsureColumnExists(connection, "LastOverdueReminderDate", "TEXT");
     }
@@ -112,9 +107,6 @@ public class DatabaseService {
         using var connection = new SqliteConnection(_connectionString);
         connection.Open();
 
-        // If the deadline is actually changing, reset the reminder tracking so the
-        // task gets a fresh 3-day/1-day/overdue reminder cycle against the new date,
-        // instead of e.g. staying stuck in "OVERDUE" against a deadline that no longer applies.
         bool deadlineChanged = false;
         if (deadline != null) {
             var currentDeadlineCommand = connection.CreateCommand();
@@ -158,10 +150,6 @@ public class DatabaseService {
         command.ExecuteNonQuery();
     }
 
-    // Returns up to `maxResults` task names, optionally scoped to one owner column
-    // (AssignedId or AssigneeId) and filtered to names containing `filter` (case-insensitive).
-    // ownerColumn is always a hardcoded literal from our own code below, never user input,
-    // so interpolating it into the SQL text is safe.
     private List<string> GetTaskNames(string? ownerColumn, string? ownerId, string? filter, int maxResults) {
 
         using var connection = new SqliteConnection(_connectionString);
@@ -193,18 +181,12 @@ public class DatabaseService {
         return names;
     }
 
-    // Tasks assigned TO this user (they're the one doing the work). Backs /updateprogress.
     public List<string> GetTaskNamesForAssignedUser(string assignedId, string? filter = null, int maxResults = 25)
         => GetTaskNames("AssignedId", assignedId, filter, maxResults);
 
-    // Tasks this user created/assigned to someone else. Backs /removetask and /updatetask,
-    // since both require the caller to be the task's creator - if they haven't assigned
-    // anything, this simply returns an empty list and autocomplete shows no suggestions.
     public List<string> GetTaskNamesForAssigneeUser(string assigneeId, string? filter = null, int maxResults = 25)
         => GetTaskNames("AssigneeId", assigneeId, filter, maxResults);
 
-    // Every task in the database, regardless of who created or was assigned it. Backs
-    // /viewtask, /forceupdatetask, and /forceremovetask, none of which have an ownership check.
     public List<string> GetAllTaskNames(string? filter = null, int maxResults = 25)
         => GetTaskNames(null, null, filter, maxResults);
 
@@ -224,10 +206,7 @@ public class DatabaseService {
         var result = command.ExecuteScalar();
         return Convert.ToString(result) ?? "";
     }
-
-    // Returns (taskFound, isNowCompleted). taskFound is false if no task with that name exists,
-    // which lets the caller tell the user the update didn't actually happen instead of falsely
-    // reporting success.
+    
     public (bool taskFound, bool isNowCompleted) SetProgress(string taskName, string progress) {
         
         using var connection = new SqliteConnection(_connectionString);
@@ -309,8 +288,6 @@ public class DatabaseService {
         return Convert.ToString(result) ?? "";
     }
 
-    // Updates the reminder-tracking state for a task. Called by ReminderService after it
-    // sends a reminder, so it knows not to send that same reminder again.
     public void UpdateReminderState(string taskName, string reminderStage, string? lastOverdueReminderDate) {
 
         using var connection = new SqliteConnection(_connectionString);
@@ -325,8 +302,6 @@ public class DatabaseService {
         command.ExecuteNonQuery();
     }
 
-    // Returns every task that isn't completed yet, for the reminder service to scan
-    // through and decide whether any deadline-based reminders are due.
     public List<TaskModel> GetActiveTasksWithDeadlines() {
 
         using var connection = new SqliteConnection(_connectionString);

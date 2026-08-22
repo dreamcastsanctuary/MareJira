@@ -53,7 +53,7 @@ public class ReminderService {
                 continue;
 
             if (deadline.Year == SentinelYear)
-                continue; // no deadline was ever set for this task
+                continue;
 
             if (!ulong.TryParse(task.AssignedId, out var assignedUserId))
                 continue;
@@ -66,21 +66,21 @@ public class ReminderService {
             var stage = string.IsNullOrEmpty(task.ReminderStage) ? StageNone : task.ReminderStage;
 
             if (daysUntil == 3 && stage == StageNone) {
-                await SendDm(assignedUser, $"⏰ :: Reminder: your task **{task.TaskName}** is due in 3 days.");
+                await SendDm(assignedUser, $"Reminder: your task **{task.TaskName}** is due in 3 days.");
                 _db.UpdateReminderState(task.TaskName, StageThreeDay, task.LastOverdueReminderDate);
             }
             else if (daysUntil == 1 && (stage == StageNone || stage == StageThreeDay)) {
-                await SendDm(assignedUser, $"⏰ :: Reminder: your task **{task.TaskName}** is due tomorrow!");
+                await SendDm(assignedUser, $"Reminder: your task **{task.TaskName}** is due tomorrow!");
                 _db.UpdateReminderState(task.TaskName, StageOneDay, task.LastOverdueReminderDate);
             }
             else if (daysUntil == 0 && stage != StageDue && stage != StageOverdue) {
-                await SendDm(assignedUser, $"📌 :: Your task **{task.TaskName}** is due **today**!");
+                await SendDm(assignedUser, $"Your task **{task.TaskName}** is due **today**!");
                 _db.UpdateReminderState(task.TaskName, StageDue, todayString);
             }
             else if (daysUntil < 0 && task.LastOverdueReminderDate != todayString) {
                 var daysOverdue = Math.Abs(daysUntil);
                 var dayWord = daysOverdue == 1 ? "day" : "days";
-                await SendDm(assignedUser, $"🚨 :: Your task **{task.TaskName}** is now {daysOverdue} {dayWord} overdue! Get in that server and report!");
+                await SendDm(assignedUser, $"Your task **{task.TaskName}** is now {daysOverdue} {dayWord} overdue! Get in that server and report!");
                 _db.UpdateReminderState(task.TaskName, StageOverdue, todayString);
             }
         }

@@ -1,6 +1,4 @@
-﻿using System;
-using System.Globalization;
-using System.Threading.Tasks;
+﻿using System.Globalization;
 using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
