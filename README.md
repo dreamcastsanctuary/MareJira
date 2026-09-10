@@ -3,4 +3,4 @@
 * * * * *
 
 <p align="center">MareJira is a regiment / scout community based bot made to assist in assigning tasks to staff members.
-Built to resemble Atlassian's Jira. But, you know, with snowpity instead of sprints.<br><br>Currently sunset in SANGO as of O9/O9/2OO26.</p>
+Built to resemble Atlassian's Jira. But, you know, with snowpity instead of sprints.<br><br>Currently sunset in SANGO as of O9/O9/2O26.</p>
